@@ -2,6 +2,18 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## GitHub Pages Deployment
+
+This application is configured to automatically deploy to GitHub Pages. The website will be available at: https://frubesss.github.io/craig-test
+
+### Setup Instructions
+
+1. **Enable GitHub Pages**: In the repository settings, go to "Pages" and set the source to "GitHub Actions"
+2. **Automatic Deployment**: The app will automatically deploy when code is pushed to the `main` branch
+3. **Manual Deployment**: You can also trigger deployment from the Actions tab
+
+The deployment workflow builds the React app and publishes it to GitHub Pages using the latest GitHub Actions.
+
 ## Available Scripts
 
 In the project directory, you can run:
