@@ -2,17 +2,36 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## GitHub Pages Deployment
+## Deployment
 
-This application is configured to automatically deploy to GitHub Pages. The website will be available at: https://frubesss.github.io/craig-test
+This application supports both production and preview deployments:
 
-### Setup Instructions
+### Production Deployment (GitHub Pages)
 
+The production website is available at: https://frubesss.github.io/craig-test
+
+**Setup Instructions:**
 1. **Enable GitHub Pages**: In the repository settings, go to "Pages" and set the source to "GitHub Actions"
-2. **Automatic Deployment**: The app will automatically deploy when code is pushed to the `main` branch
-3. **Manual Deployment**: You can also trigger deployment from the Actions tab
+2. **Automatic Deployment**: The app automatically deploys when code is pushed to the `main` branch
+3. **Manual Deployment**: You can trigger deployment from the Actions tab
 
-The deployment workflow builds the React app and publishes it to GitHub Pages using the latest GitHub Actions.
+### Preview Deployments (Pull Requests)
+
+Every pull request automatically gets its own preview deployment using Surge.sh.
+
+**Features:**
+- Each PR gets a unique preview URL: `https://pr-{number}-craig-test.surge.sh`
+- Previews are automatically updated when you push new changes to the PR
+- Previews are automatically cleaned up when the PR is closed
+- Bot comments on PRs with the preview URL
+
+**Setup Instructions:**
+1. **Create Surge.sh Account**: Sign up at [surge.sh](https://surge.sh/)
+2. **Generate Token**: Run `surge token` locally to get your token
+3. **Add Secret**: In repository settings → Secrets → Actions, add `SURGE_TOKEN` with your token
+4. **Automatic Operation**: Preview deployments will work automatically for all new PRs
+
+The deployment workflows build the React app and publish it using the latest GitHub Actions.
 
 ## Available Scripts
 
