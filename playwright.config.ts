@@ -29,8 +29,8 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Use system Google Chrome
-        channel: 'chrome',
+        // Use system Google Chrome on CI, bundled chromium locally
+        channel: process.env.CI ? undefined : 'chrome',
       },
     },
   ],
