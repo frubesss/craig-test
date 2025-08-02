@@ -17,19 +17,17 @@ The production website is available at: https://frubesss.github.io/craig-test
 
 ### Preview Deployments (Pull Requests)
 
-Every pull request automatically gets its own preview deployment using Surge.sh.
+Every pull request automatically gets its own preview deployment using GitHub Pages.
 
 **Features:**
-- Each PR gets a unique preview URL: `https://pr-{number}-craig-test.surge.sh`
+- Each PR gets a unique preview URL: `https://frubesss.github.io/github-agent-test/pr-{number}/`
 - Previews are automatically updated when you push new changes to the PR
 - Previews are automatically cleaned up when the PR is closed
 - Bot comments on PRs with the preview URL
 
 **Setup Instructions:**
-1. **Create Surge.sh Account**: Sign up at [surge.sh](https://surge.sh/)
-2. **Generate Token**: Run `surge token` locally to get your token
-3. **Add Secret**: In repository settings → Secrets → Actions, add `SURGE_TOKEN` with your token
-4. **Automatic Operation**: Preview deployments will work automatically for all new PRs
+1. **Enable GitHub Pages**: In repository settings → Pages, set source to "Deploy from a branch" and select "gh-pages"
+2. **Automatic Operation**: Preview deployments will work automatically for all new PRs (no secrets or external accounts required)
 
 The deployment workflows build the React app and publish it using the latest GitHub Actions.
 
