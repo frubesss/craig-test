@@ -14,6 +14,37 @@ This application is configured to automatically deploy to GitHub Pages. The webs
 
 The deployment workflow builds the React app and publishes it to GitHub Pages using the latest GitHub Actions.
 
+## Test Coverage Monitoring
+
+This project includes automated daily test coverage analysis that helps maintain code quality and identify areas that may need additional tests.
+
+### Daily Coverage Analysis
+
+A GitHub Actions workflow runs daily at 9 AM UTC to:
+
+- ✅ Run all tests with coverage reporting
+- ✅ Analyze coverage against 80% thresholds (statements, branches, functions, lines)
+- ✅ Identify files with low coverage that may need additional tests
+- ✅ Automatically create/update GitHub issues when coverage needs attention
+- ✅ Automatically close issues when coverage thresholds are met
+- ✅ Provide specific suggestions for test improvements
+
+### Coverage Commands
+
+- `npm run test:coverage` - Run tests with coverage reporting
+- `npm run coverage:analyze` - Local coverage analysis with detailed insights
+- View detailed HTML coverage reports at `coverage/lcov-report/index.html`
+
+### Coverage Thresholds
+
+The project maintains the following coverage thresholds:
+- **Statements**: 80%
+- **Branches**: 80% 
+- **Functions**: 80%
+- **Lines**: 80%
+
+Files that fall below these thresholds will be flagged for attention with specific suggestions for improvement.
+
 ## Available Scripts
 
 In the project directory, you can run:
@@ -30,6 +61,20 @@ You will also see any lint errors in the console.
 
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `npm run test:coverage`
+
+Runs all tests with coverage reporting. This will generate a coverage report showing which parts of the code are covered by tests.
+
+### `npm run coverage:analyze`
+
+Runs a comprehensive coverage analysis that:
+- Executes all tests with coverage reporting
+- Analyzes coverage results against 80% thresholds
+- Identifies files that may need additional tests
+- Provides suggestions for test improvements
+
+This is the same analysis that runs daily via GitHub Actions.
 
 ### `npm run build`
 

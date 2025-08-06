@@ -1,0 +1,260 @@
+name: Daily Coverage Analysis
+
+on:
+  schedule:
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  coverage-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests with coverage
+      run: npm test -- --coverage --watchAll=false --coverageReporters=text --coverageReporters=json-summary
+      
+    - name: Analyze coverage results
+      id: coverage-analysis
+      run: |
+        # Read coverage summary
+        if [ -f coverage/coverage-summary.json ]; then
+          echo "Coverage report found, analyzing..."
+          
+          # Extract overall coverage percentages
+          STMT_PCT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.statements.pct)")
+          BRANCH_PCT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.branches.pct)")
+          FUNC_PCT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.functions.pct)")
+          LINE_PCT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.lines.pct)")
+          
+          echo "STMT_PCT=$STMT_PCT" >> $GITHUB_OUTPUT
+          echo "BRANCH_PCT=$BRANCH_PCT" >> $GITHUB_OUTPUT
+          echo "FUNC_PCT=$FUNC_PCT" >> $GITHUB_OUTPUT
+          echo "LINE_PCT=$LINE_PCT" >> $GITHUB_OUTPUT
+          
+          # Define thresholds
+          STMT_THRESHOLD=80
+          BRANCH_THRESHOLD=80
+          FUNC_THRESHOLD=80
+          LINE_THRESHOLD=80
+          
+          echo "Coverage Analysis Results:"
+          echo "Statements: $STMT_PCT% (threshold: $STMT_THRESHOLD%)"
+          echo "Branches: $BRANCH_PCT% (threshold: $BRANCH_THRESHOLD%)"
+          echo "Functions: $FUNC_PCT% (threshold: $FUNC_THRESHOLD%)"
+          echo "Lines: $LINE_PCT% (threshold: $LINE_THRESHOLD%)"
+          
+          # Check if any coverage is below threshold using node instead of bc
+          NEEDS_ATTENTION=$(node -e "
+            const stmt = $STMT_PCT; 
+            const branch = $BRANCH_PCT; 
+            const func = $FUNC_PCT; 
+            const line = $LINE_PCT;
+            console.log(stmt < 80 || branch < 80 || func < 80 || line < 80 ? 'true' : 'false');
+          ")
+          
+          echo "NEEDS_ATTENTION=$NEEDS_ATTENTION" >> $GITHUB_OUTPUT
+        else
+          echo "No coverage report found!"
+          exit 1
+        fi
+
+    - name: Generate coverage report
+      id: generate-report
+      run: |
+        # Create a detailed coverage report
+        CURRENT_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        STMT_PCT="${{ steps.coverage-analysis.outputs.STMT_PCT }}"
+        BRANCH_PCT="${{ steps.coverage-analysis.outputs.BRANCH_PCT }}"
+        FUNC_PCT="${{ steps.coverage-analysis.outputs.FUNC_PCT }}"
+        LINE_PCT="${{ steps.coverage-analysis.outputs.LINE_PCT }}"
+        
+        cat << EOF > coverage-report.md
+        # 📊 Daily Test Coverage Report
+        
+        **Generated on:** $CURRENT_DATE
+        
+        ## Overall Coverage
+        
+        | Metric | Current | Threshold | Status |
+        |--------|---------|-----------|--------|
+        | Statements | ${STMT_PCT}% | 80% | $(node -e "console.log($STMT_PCT >= 80 ? '✅ Pass' : '❌ Needs Attention')") |
+        | Branches | ${BRANCH_PCT}% | 80% | $(node -e "console.log($BRANCH_PCT >= 80 ? '✅ Pass' : '❌ Needs Attention')") |
+        | Functions | ${FUNC_PCT}% | 80% | $(node -e "console.log($FUNC_PCT >= 80 ? '✅ Pass' : '❌ Needs Attention')") |
+        | Lines | ${LINE_PCT}% | 80% | $(node -e "console.log($LINE_PCT >= 80 ? '✅ Pass' : '❌ Needs Attention')") |
+        
+        ## Files That May Need Additional Tests
+        
+        EOF
+        
+        # Add file-by-file analysis
+        node << 'EOD' >> coverage-report.md
+        const fs = require('fs');
+        const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+        
+        const lowCoverageFiles = [];
+        
+        for (const [file, metrics] of Object.entries(coverage)) {
+          if (file === 'total') continue;
+          
+          const issues = [];
+          if (metrics.statements.pct < 80) issues.push(`Statements: ${metrics.statements.pct}%`);
+          if (metrics.branches.pct < 80) issues.push(`Branches: ${metrics.branches.pct}%`);
+          if (metrics.functions.pct < 80) issues.push(`Functions: ${metrics.functions.pct}%`);
+          if (metrics.lines.pct < 80) issues.push(`Lines: ${metrics.lines.pct}%`);
+          
+          if (issues.length > 0) {
+            const relativePath = file.replace(process.cwd() + '/', '');
+            lowCoverageFiles.push(`- **${relativePath}**: ${issues.join(', ')}`);
+          }
+        }
+        
+        if (lowCoverageFiles.length === 0) {
+          console.log('🎉 All files meet the coverage thresholds! Great job!');
+        } else {
+          console.log('The following files have coverage below 80%:\n');
+          lowCoverageFiles.forEach(file => console.log(file));
+          console.log('\n### Suggestions for Improvement\n');
+          console.log('1. **Add unit tests** for uncovered functions and edge cases');
+          console.log('2. **Add integration tests** for complex user workflows'); 
+          console.log('3. **Add error handling tests** for exception scenarios');
+          console.log('4. **Review untested branches** and add conditional logic tests');
+        }
+        EOD
+        
+        # Store report content for next step
+        {
+          echo "REPORT_CONTENT<<EOF"
+          cat coverage-report.md
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+
+    - name: Create/Update Coverage Issue
+      if: steps.coverage-analysis.outputs.NEEDS_ATTENTION == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const reportContent = `${{ steps.generate-report.outputs.REPORT_CONTENT }}`;
+          
+          // Look for existing coverage issue
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: 'coverage,automated'
+          });
+          
+          const existingIssue = issues.data.find(issue => 
+            issue.title.includes('Daily Coverage Report')
+          );
+          
+          const issueBody = `${reportContent}
+          
+          ---
+          
+          This issue was automatically created by the daily coverage analysis workflow.
+          The workflow runs daily at 9 AM UTC to monitor test coverage and suggest improvements.
+          
+          **Next Steps:**
+          - Review the files listed above
+          - Add tests for uncovered code paths
+          - Consider the suggested improvements
+          - This issue will be updated with the next daily report
+          
+          If coverage improves above thresholds, this issue will be automatically closed.`;
+          
+          if (existingIssue) {
+            // Update existing issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existingIssue.number,
+              body: issueBody
+            });
+            
+            console.log(`Updated existing coverage issue #${existingIssue.number}`);
+          } else {
+            // Create new issue
+            const newIssue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '📊 Daily Coverage Report - Action Needed',
+              body: issueBody,
+              labels: ['coverage', 'automated', 'needs-tests']
+            });
+            
+            console.log(`Created new coverage issue #${newIssue.data.number}`);
+          }
+
+    - name: Close Coverage Issue if Thresholds Met
+      if: steps.coverage-analysis.outputs.NEEDS_ATTENTION == 'false'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Look for existing coverage issue
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: 'coverage,automated'
+          });
+          
+          const existingIssue = issues.data.find(issue => 
+            issue.title.includes('Daily Coverage Report')
+          );
+          
+          if (existingIssue) {
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existingIssue.number,
+              state: 'closed'
+            });
+            
+            // Add closing comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existingIssue.number,
+              body: `🎉 **Coverage thresholds now met!**
+              
+              Current coverage levels:
+              - Statements: ${{ steps.coverage-analysis.outputs.STMT_PCT }}% (≥80%)
+              - Branches: ${{ steps.coverage-analysis.outputs.BRANCH_PCT }}% (≥80%) 
+              - Functions: ${{ steps.coverage-analysis.outputs.FUNC_PCT }}% (≥80%)
+              - Lines: ${{ steps.coverage-analysis.outputs.LINE_PCT }}% (≥80%)
+              
+              All coverage metrics now meet or exceed the 80% threshold. Great work!
+              
+              This issue has been automatically closed by the daily coverage analysis workflow.`
+            });
+            
+            console.log(`Closed coverage issue #${existingIssue.number} - thresholds now met`);
+          }
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ github.run_number }}
+        path: |
+          coverage/
+          coverage-report.md
+        retention-days: 30
